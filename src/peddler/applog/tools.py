@@ -1,3 +1,5 @@
+"""MCP tool registration for recording `/apply` attempt outcomes."""
+
 from datetime import UTC, datetime
 from typing import Any
 
@@ -32,6 +34,13 @@ def _make_record_application(log: ApplicationLog):
 
 
 def register_applog_tools(registry: ToolRegistry, log: ApplicationLog) -> None:
+    """Register the ``record_application`` tool against a tool registry.
+
+    :param registry: The registry to register the tool against.
+    :type registry: ToolRegistry
+    :param log: The application log the tool's handler appends to.
+    :type log: ApplicationLog
+    """
     registry.register(
         "record_application",
         "Record the outcome of one /apply attempt to the persistent application log.",
