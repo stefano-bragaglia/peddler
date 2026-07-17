@@ -3,6 +3,8 @@
 ![Peddler logo](docs/logo.png)
 
 [![CI](https://github.com/stefano-bragaglia/peddler/actions/workflows/ci.yml/badge.svg)](https://github.com/stefano-bragaglia/peddler/actions/workflows/ci.yml)
+[![Python 3.14+](https://img.shields.io/badge/python-3.14%2B-blue.svg)](https://www.python.org/downloads/)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![License](https://img.shields.io/github/license/stefano-bragaglia/peddler)](LICENSE)
 
 <!-- PyPI version + Python versions badges added by /publish once the first version ships -->
