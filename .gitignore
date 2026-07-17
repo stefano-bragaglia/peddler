@@ -1,0 +1,17 @@
+.venv/
+.serena/
+__pycache__/
+*.pyc
+.idea/
+.DS_Store
+.env
+*.egg-info/
+dist/
+.coverage
+htmlcov/
+
+# defense-in-depth: these belong to the vault repo, never project/
+meta/
+.claude/
+CLAUDE.md
+Notes.md

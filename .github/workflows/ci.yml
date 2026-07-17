@@ -1,0 +1,20 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv sync
+      - name: ruff
+        run: uv run ruff check
+      - name: radon
+        run: uv run radon cc -n B src tests
+      - name: pytest
+        # exit code 5 = no tests collected yet (pre-stage-a scaffolding), not a real failure
+        run: uv run pytest --cov=src/peddler --cov-fail-under=90 || [ $? -eq 5 ]
