@@ -16,10 +16,24 @@ class Server:
     """Reads JSON-RPC requests from a Transport and dispatches them to a ToolRegistry."""
 
     def __init__(self, transport: Transport, registry: ToolRegistry) -> None:
+        """Initialize a server over a transport and a tool registry.
+
+        :param transport: The transport requests are read from and
+            responses are written to.
+        :type transport: Transport
+        :param registry: The registry tool calls are dispatched against.
+        :type registry: ToolRegistry
+        """
         self._transport = transport
         self._registry = registry
 
     def handle_one(self) -> bool:
+        """Read and dispatch one JSON-RPC request, skipping malformed ones.
+
+        :returns: ``True`` if a request was handled, ``False`` if the
+            transport reached end of input.
+        :rtype: bool
+        """
         request = None
         while request is None:
             try:
@@ -36,6 +50,7 @@ class Server:
         return True
 
     def serve_forever(self) -> None:
+        """Handle requests in a loop until the transport reaches end of input."""
         while self.handle_one():
             pass
 
