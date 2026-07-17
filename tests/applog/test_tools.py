@@ -63,3 +63,49 @@ def test_simulated_write_failure_returns_structured_error(tmp_path):
 
     assert result["ok"] is False
     assert "error" in result
+
+
+def test_list_applications_registered_with_expected_name(tmp_path):
+    registry, _ = _registry(tmp_path)
+
+    assert registry.get("list_applications") is not None
+
+
+def test_list_applications_empty_when_no_log(tmp_path):
+    registry, _ = _registry(tmp_path)
+
+    result = registry.get("list_applications").handler({})
+
+    assert result == {"applications": []}
+
+
+def test_list_applications_returns_all_recorded_entries(tmp_path):
+    registry, _ = _registry(tmp_path)
+    registry.get("record_application").handler(
+        {"url": "https://acme.example.com/apply", "outcome": "success"}
+    )
+    registry.get("record_application").handler(
+        {"url": "https://other.example.com/apply", "outcome": "aborted"}
+    )
+
+    result = registry.get("list_applications").handler({})
+
+    assert [a["url"] for a in result["applications"]] == [
+        "https://acme.example.com/apply",
+        "https://other.example.com/apply",
+    ]
+
+
+def test_list_applications_filters_by_url(tmp_path):
+    registry, _ = _registry(tmp_path)
+    registry.get("record_application").handler(
+        {"url": "https://acme.example.com/apply", "outcome": "success"}
+    )
+    registry.get("record_application").handler(
+        {"url": "https://other.example.com/apply", "outcome": "aborted"}
+    )
+
+    result = registry.get("list_applications").handler({"url": "https://acme.example.com/apply"})
+
+    assert len(result["applications"]) == 1
+    assert result["applications"][0]["url"] == "https://acme.example.com/apply"

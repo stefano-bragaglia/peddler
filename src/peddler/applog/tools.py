@@ -17,6 +17,11 @@ _SCHEMA = {
     "required": ["url", "outcome"],
 }
 
+_LIST_SCHEMA = {
+    "type": "object",
+    "properties": {"url": {"type": "string"}},
+}
+
 
 def _make_record_application(log: ApplicationLog):
     def record_application(arguments: dict[str, Any]) -> dict[str, Any]:
@@ -33,12 +38,20 @@ def _make_record_application(log: ApplicationLog):
     return record_application
 
 
-def register_applog_tools(registry: ToolRegistry, log: ApplicationLog) -> None:
-    """Register the ``record_application`` tool against a tool registry.
+def _make_list_applications(log: ApplicationLog):
+    def list_applications(arguments: dict[str, Any]) -> dict[str, Any]:
+        return {"applications": log.list(url=arguments.get("url"))}
 
-    :param registry: The registry to register the tool against.
+    return list_applications
+
+
+def register_applog_tools(registry: ToolRegistry, log: ApplicationLog) -> None:
+    """Register the ``record_application``/``list_applications`` tools.
+
+    :param registry: The registry to register both tools against.
     :type registry: ToolRegistry
-    :param log: The application log the tool's handler appends to.
+    :param log: The application log both tools' handlers read from and
+        append to.
     :type log: ApplicationLog
     """
     registry.register(
@@ -46,4 +59,10 @@ def register_applog_tools(registry: ToolRegistry, log: ApplicationLog) -> None:
         "Record the outcome of one /apply attempt to the persistent application log.",
         _SCHEMA,
         _make_record_application(log),
+    )
+    registry.register(
+        "list_applications",
+        "List past /apply attempts, optionally filtered by URL.",
+        _LIST_SCHEMA,
+        _make_list_applications(log),
     )
