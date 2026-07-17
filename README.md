@@ -30,6 +30,33 @@ and report back what happened, including any validation error the page surfaced.
 | `read_credentials(site)` / `write_credentials(site, username, password)` | The only way anything touches the local credentials log book |
 | `record_application(url, outcome)` / `list_applications(url=None)` | Append-only application history: outcome is `success`, `aborted`, or `stuck-unresolved` |
 
+## Design rationale
+
+- **Single global session, not a session registry.** `open_session`/`close_session` hold one module-level
+  session object rather than a session-id-keyed registry. One active `/apply` at a time is a hard requirement,
+  not just today's use case, so a multi-session registry would be generality the system will never exercise.
+- **`retry_with_backoff` as its own module.** Both `open_session`'s navigation and `advance_page`'s submit wrap
+  the same generic, injectable-sleep retry helper rather than each hand-rolling a loop — the reliability policy
+  (3 attempts, exponential backoff) is defined once and unit-tested once, not duplicated per call site.
+- **Fakes over a real browser in tests.** Every browser-tool test injects a fake page object (or a fake
+  `browser_factory`) instead of driving real Playwright. The full suite runs in well under a second with no
+  browser binaries required in CI — the tradeoff is that the real Playwright adapter itself is a thin,
+  intentionally-untested wrapper around a few one-line calls.
+- **Passwords never reach the LLM.** `read_credentials` deliberately omits the password from its return value;
+  `fill_credential_field` resolves and applies it server-side. The only code path a stored password travels
+  through is one the LLM's context never sees.
+
+## Known limitations
+
+By design, not by omission — explicitly out of scope for this version:
+
+- No CAPTCHA solving or anti-bot/stealth evasion beyond normal, honest form-filling.
+- No cover-letter generation.
+- One active `/apply` session at a time; concurrent runs aren't supported.
+- The credentials log book is stored in plaintext on disk — encryption at rest is deferred.
+- Obfuscated emails in a CV (e.g. `name (at) domain (dot) com`) aren't recognized by the email extractor; only
+  plain `user@domain.tld` forms are.
+
 ## Installation
 
 Requires Python 3.14, [uv](https://docs.astral.sh/uv/), and Claude CLI.
