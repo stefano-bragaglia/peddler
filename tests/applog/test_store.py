@@ -83,3 +83,55 @@ def test_append_is_a_single_write_call(tmp_path, monkeypatch):
 
     assert len(write_calls) == 1
     assert write_calls[0].endswith("\n")
+
+
+def test_list_on_missing_file_returns_empty_list(tmp_path):
+    log = _log(tmp_path)
+
+    assert log.list() == []
+
+
+def test_list_returns_all_entries_in_recording_order(tmp_path):
+    log = _log(tmp_path)
+    log.append("https://acme.example.com/apply", "2026-07-17T12:00:00+00:00", "success")
+    log.append("https://other.example.com/apply", "2026-07-17T12:05:00+00:00", "aborted")
+
+    entries = log.list()
+
+    assert [e["url"] for e in entries] == [
+        "https://acme.example.com/apply",
+        "https://other.example.com/apply",
+    ]
+
+
+def test_list_filters_by_url(tmp_path):
+    log = _log(tmp_path)
+    log.append("https://acme.example.com/apply", "2026-07-17T12:00:00+00:00", "success")
+    log.append("https://other.example.com/apply", "2026-07-17T12:05:00+00:00", "aborted")
+
+    entries = log.list(url="https://acme.example.com/apply")
+
+    assert len(entries) == 1
+    assert entries[0]["url"] == "https://acme.example.com/apply"
+
+
+def test_list_url_filter_matching_nothing_returns_empty_list(tmp_path):
+    log = _log(tmp_path)
+    log.append("https://acme.example.com/apply", "2026-07-17T12:00:00+00:00", "success")
+
+    assert log.list(url="https://nowhere.example.com/apply") == []
+
+
+def test_list_skips_corrupt_line_and_returns_valid_entries(tmp_path):
+    log = _log(tmp_path)
+    log.append("https://acme.example.com/apply", "2026-07-17T12:00:00+00:00", "success")
+    with open(log.path, "a") as handle:
+        handle.write("not valid json\n")
+    log.append("https://other.example.com/apply", "2026-07-17T12:05:00+00:00", "aborted")
+
+    entries = log.list()
+
+    assert [e["url"] for e in entries] == [
+        "https://acme.example.com/apply",
+        "https://other.example.com/apply",
+    ]
