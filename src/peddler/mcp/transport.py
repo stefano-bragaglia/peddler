@@ -12,10 +12,24 @@ class Transport:
     """Reads and writes newline-delimited JSON objects over stdio."""
 
     def __init__(self, stdin: TextIO, stdout: TextIO) -> None:
+        """Initialize a transport over the given streams.
+
+        :param stdin: The stream messages are read from.
+        :type stdin: TextIO
+        :param stdout: The stream messages are written to.
+        :type stdout: TextIO
+        """
         self._stdin = stdin
         self._stdout = stdout
 
     def read_message(self) -> dict[str, Any] | None:
+        """Read the next non-blank line as a JSON object.
+
+        :returns: The parsed message, or ``None`` at end of input.
+        :rtype: dict[str, Any] | None
+        :raises TransportError: If a non-blank line isn't valid JSON, or
+            isn't a JSON object.
+        """
         while True:
             line = self._stdin.readline()
             if not line:
@@ -32,4 +46,9 @@ class Transport:
             return message
 
     def write_message(self, message: dict[str, Any]) -> None:
+        """Write a JSON object as one newline-terminated line.
+
+        :param message: The message to serialize and write.
+        :type message: dict[str, Any]
+        """
         self._stdout.write(json.dumps(message) + "\n")

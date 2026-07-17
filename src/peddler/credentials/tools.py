@@ -1,3 +1,5 @@
+"""MCP tool registration for reading and writing the credentials log book."""
+
 from typing import Any
 
 from peddler.credentials.store import CredentialStore, CredentialStoreCorruptError
@@ -49,6 +51,14 @@ def _make_write_credentials(store: CredentialStore):
 
 
 def register_credential_tools(registry: ToolRegistry, store: CredentialStore) -> None:
+    """Register the ``read_credentials``/``write_credentials`` tools.
+
+    :param registry: The registry to register both tools against.
+    :type registry: ToolRegistry
+    :param store: The credential store both tools' handlers read from
+        and write to.
+    :type store: CredentialStore
+    """
     registry.register(
         "read_credentials",
         "Look up stored credentials for a site. Never returns the password.",
