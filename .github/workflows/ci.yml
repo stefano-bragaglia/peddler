@@ -20,3 +20,7 @@ jobs:
       - name: pytest
         # exit code 5 = no tests collected yet (pre-stage-a scaffolding), not a real failure
         run: uv run pytest --cov=src/peddler --cov-fail-under=90 || [ $? -eq 5 ]
+      - name: per-file coverage
+        run: |
+          uv run coverage json -o coverage.json -q
+          uv run python scripts/check_file_coverage.py

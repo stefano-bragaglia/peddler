@@ -12,7 +12,10 @@ class NavigationError(Exception):
     """Raised when navigating to a URL fails."""
 
 
-def _default_browser_factory() -> Any:
+def _default_browser_factory() -> Any:  # pragma: no cover
+    # ponytail: real Playwright adapter, deliberately untested here (needs real
+    # browser binaries); every open_session/close_session test injects a fake
+    # browser_factory instead. See README.md -> Design rationale.
     from playwright.sync_api import sync_playwright
 
     class _PlaywrightPage:

@@ -8,6 +8,7 @@ __pycache__/
 *.egg-info/
 dist/
 .coverage
+coverage.json
 htmlcov/
 
 # defense-in-depth: these belong to the vault repo, never project/
