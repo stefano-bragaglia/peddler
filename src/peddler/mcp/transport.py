@@ -52,3 +52,4 @@ class Transport:
         :type message: dict[str, Any]
         """
         self._stdout.write(json.dumps(message) + "\n")
+        self._stdout.flush()
