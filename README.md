@@ -71,20 +71,22 @@ By design, not by omission — explicitly out of scope for this version:
 Requires Python 3.14, [uv](https://docs.astral.sh/uv/), and Claude CLI.
 
 ```bash
-uv sync
+uv tool install --editable .
 uv run playwright install chromium
 ```
 
-This installs two console scripts: `peddler` (the launcher you actually run) and `peddler-mcp` (the MCP server
-process — spawned by Claude Code itself, never run directly).
+`uv tool install` (not `uv run`) matters here: it puts `peddler` and `peddler-mcp` on your `PATH` **globally**,
+not just for the duration of one `uv run` invocation. `peddler-mcp` needs to be resolvable later, whenever Claude
+Code spawns it — which may well be from a different terminal/shell session than the one you installed from.
 
 ## Usage
 
-Start a session with the `peddler` launcher — it checks Playwright is ready, registers the MCP server with
-Claude Code (local scope, idempotent), and hands off to `claude` in the target workspace:
+Start a session with the `peddler` launcher — it installs the `/apply` command for Claude Code (idempotent,
+`~/.claude/commands/apply.md`), checks Playwright is ready, registers the MCP server with Claude Code (local
+scope, also idempotent), and hands off to `claude` in the target workspace:
 
 ```
-$ uv run peddler --dir ~/job-search --credentials ~/job-search/.peddler/credentials.json
+$ peddler --dir ~/job-search --credentials ~/job-search/.peddler/credentials.json
 ```
 
 `--dir` defaults to the current directory; `--credentials`/`--applog` default to `~/.peddler/credentials.json`/
@@ -122,7 +124,7 @@ Peddler: 🎉 Application submitted successfully. Check your email for follow-up
     │   ├── launcher.py     ← the `peddler` console script
     │   └── email.py        ← CV contact-email extraction
     ├── scripts/            ← dev tooling (e.g. the per-file coverage check, below)
-    └── tests/              ← 126 tests, 99%+ coverage
+    └── tests/              ← 132 tests, 99%+ coverage
 
 ## Dev
 
