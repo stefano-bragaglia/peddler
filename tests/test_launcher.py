@@ -123,7 +123,7 @@ def test_defaults_used_when_credentials_and_applog_omitted(tmp_path):
     )
 
     ((call_args, _),) = register_mcp.calls
-    assert call_args == (str(tmp_path), str(DEFAULT_CREDENTIALS_PATH), str(DEFAULT_APPLOG_PATH))
+    assert call_args == (str(tmp_path), str(DEFAULT_CREDENTIALS_PATH), str(DEFAULT_APPLOG_PATH), False)
 
 
 def test_explicit_credentials_and_applog_are_passed_through(tmp_path):
@@ -142,7 +142,41 @@ def test_explicit_credentials_and_applog_are_passed_through(tmp_path):
     )
 
     ((call_args, _),) = register_mcp.calls
-    assert call_args == (str(tmp_path), str(creds), str(applog))
+    assert call_args == (str(tmp_path), str(creds), str(applog), False)
+
+
+def test_headless_flag_is_passed_through_to_register_mcp(tmp_path):
+    register_mcp = _Recorder()
+
+    main(
+        argv=["--dir", str(tmp_path), "--headless"],
+        install_command=_noop_install_command,
+        check_playwright=_noop_check_playwright,
+        register_mcp=register_mcp,
+        exec_fn=_Recorder(),
+        chdir=_Recorder(),
+        which=_Recorder(result="/usr/bin/claude"),
+    )
+
+    ((call_args, _),) = register_mcp.calls
+    assert call_args[3] is True
+
+
+def test_headless_defaults_to_false_ie_visible(tmp_path):
+    register_mcp = _Recorder()
+
+    main(
+        argv=["--dir", str(tmp_path)],
+        install_command=_noop_install_command,
+        check_playwright=_noop_check_playwright,
+        register_mcp=register_mcp,
+        exec_fn=_Recorder(),
+        chdir=_Recorder(),
+        which=_Recorder(result="/usr/bin/claude"),
+    )
+
+    ((call_args, _),) = register_mcp.calls
+    assert call_args[3] is False
 
 
 def test_passthrough_args_after_double_dash_forwarded_to_claude(tmp_path):

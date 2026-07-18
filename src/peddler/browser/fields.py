@@ -3,11 +3,8 @@
 from typing import Any
 
 import peddler.browser.session as session
+from peddler.browser.session import FieldNotFoundError
 from peddler.credentials.store import CredentialStore, CredentialStoreCorruptError
-
-
-class FieldNotFoundError(Exception):
-    """Raised when a field id doesn't match any field on the current page."""
 
 
 def _apply_fill(field_id: str, value: str) -> dict[str, Any] | None:

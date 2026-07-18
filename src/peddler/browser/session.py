@@ -1,5 +1,6 @@
 """Single-session browser lifecycle: the open_session/close_session tools."""
 
+import os
 import time
 from typing import Any, Callable
 
@@ -12,28 +13,46 @@ class NavigationError(Exception):
     """Raised when navigating to a URL fails."""
 
 
+class FieldNotFoundError(Exception):
+    """Raised when a field id doesn't match any field on the current page."""
+
+
+def _is_headless() -> bool:
+    """Read the ``PEDDLER_HEADLESS`` env var; unset/empty means visible.
+
+    :returns: ``True`` if the real browser should run headless.
+    :rtype: bool
+    """
+    return os.environ.get("PEDDLER_HEADLESS", "").strip().lower() in ("1", "true", "yes")
+
+
 def _default_browser_factory() -> Any:  # pragma: no cover
-    # ponytail: real Playwright adapter, deliberately untested here (needs real
-    # browser binaries); every open_session/close_session test injects a fake
-    # browser_factory instead. See README.md -> Design rationale.
+    # ponytail: real Playwright adapter, exercised by tests/browser/test_real_adapter.py
+    # against local file:// fixtures (real Chromium, forced headless there via
+    # PEDDLER_HEADLESS) -- every open_session/fill_field/advance_page unit test still
+    # injects a fake page/browser_factory. See README.md -> Design rationale.
     from playwright.sync_api import sync_playwright
 
     class _PlaywrightPage:
         """Adapts a real Playwright page to this module's page protocol."""
 
         def __init__(self) -> None:
-            """Launch a headless Chromium browser and open a new page."""
+            """Launch a Chromium browser (visible unless PEDDLER_HEADLESS) and open a page."""
             self._playwright = sync_playwright().start()
-            self._browser = self._playwright.chromium.launch(headless=True)
+            self._browser = self._playwright.chromium.launch(headless=_is_headless())
             self._page = self._browser.new_page()
 
         def goto(self, url: str) -> None:
-            """Navigate this page to ``url``.
+            """Navigate this page to ``url``, waiting for JS-rendered content to settle.
 
             :param url: The URL to navigate to.
             :type url: str
+            :raises NavigationError: If navigation fails or times out.
             """
-            self._page.goto(url)
+            try:
+                self._page.goto(url, wait_until="networkidle")
+            except Exception as exc:
+                raise NavigationError(str(exc)) from exc
 
         def content(self) -> str:
             """Return the current page's content.
@@ -42,6 +61,76 @@ def _default_browser_factory() -> Any:  # pragma: no cover
             :rtype: str
             """
             return self._page.content()
+
+        def fill(self, field_id: str, value: str) -> dict[str, Any]:
+            """Set a field's value by its ``id``.
+
+            :param field_id: The ``id`` attribute of the field to fill.
+            :type field_id: str
+            :param value: The value to set. For a checkbox, a truthy
+                string (``"true"``, ``"1"``, ``"yes"``) checks it.
+            :type value: str
+            :returns: ``{"status": "ok"}``.
+            :rtype: dict[str, Any]
+            :raises FieldNotFoundError: If no element has that ``id``.
+            """
+            locator = self._page.locator(f"#{field_id}")
+            if locator.count() == 0:
+                raise FieldNotFoundError(field_id)
+
+            if locator.get_attribute("type") == "checkbox":
+                if value.lower() in ("true", "1", "yes"):
+                    locator.check()
+                else:
+                    locator.uncheck()
+            else:
+                locator.fill(value)
+            return {"status": "ok"}
+
+        def is_checked(self, field_id: str) -> bool:
+            """Return whether the checkbox with ``id`` ``field_id`` is checked.
+
+            :param field_id: The ``id`` attribute of the checkbox.
+            :type field_id: str
+            :returns: Whether it's checked.
+            :rtype: bool
+            """
+            return self._page.locator(f"#{field_id}").is_checked()
+
+        def submit(self) -> dict[str, Any]:
+            """Click the current page's submit control and report the outcome.
+
+            Field-level validation errors are detected via the best-effort
+            ``aria-invalid``/``aria-describedby`` heuristic: any element left
+            with ``aria-invalid="true"`` after the click is treated as a
+            rejected field, with its message read from the element its
+            ``aria-describedby`` points at, if any.
+
+            :returns: ``{"status": "advanced", "content": <page content>}``
+                if no field was left invalid; ``{"status": "error",
+                "field_errors": {field_id: message, ...}}`` otherwise.
+            :rtype: dict[str, Any]
+            :raises NavigationError: If clicking submit or settling fails.
+            """
+            try:
+                self._page.locator('button[type="submit"], input[type="submit"]').first.click()
+                self._page.wait_for_load_state("networkidle")
+            except Exception as exc:
+                raise NavigationError(str(exc)) from exc
+
+            invalid = self._page.locator('[aria-invalid="true"]')
+            count = invalid.count()
+            if count == 0:
+                return {"status": "advanced", "content": self.content()}
+
+            field_errors = {}
+            for i in range(count):
+                element = invalid.nth(i)
+                field_id = element.get_attribute("id")
+                described_by = element.get_attribute("aria-describedby")
+                message = self._page.locator(f"#{described_by}").inner_text() if described_by else ""
+                field_errors[field_id] = message
+            return {"status": "error", "field_errors": field_errors}
 
         def close(self) -> None:
             """Close the browser and stop the underlying Playwright process."""

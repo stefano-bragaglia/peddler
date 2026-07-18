@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fixture Late-Render Page</title>
+</head>
+<body>
+<div id="app">Loading...</div>
+<script>
+  // Simulates a JS-rendered "micro-app" (e.g. an ATS careers page) whose real
+  // content only appears after the initial page load event -- the exact bug
+  // that goto()'s previous default wait_until="load" missed.
+  setTimeout(function () {
+    document.getElementById("app").innerHTML =
+      '<form id="app-form"><input type="text" id="full_name" name="full_name"></form>';
+  }, 300);
+</script>
+</body>
+</html>

@@ -10,8 +10,8 @@
 <!-- PyPI version + Python versions badges added by /publish once the first version ships -->
 
 **Peddler** peddles your CV, door to door, one job application form at a time. It's a Claude Code slash command,
-`/apply <cv.md> <jd.md> <url>`, backed by an MCP server that gives the LLM a single headless browser session to
-drive.
+`/apply <cv.md> <jd.md> <url>`, backed by an MCP server that gives the LLM a single browser session to drive —
+visible by default, so you can watch it work; pass `--headless` to run it out of sight.
 
 ## Background
 
@@ -25,7 +25,7 @@ and report back what happened, including any validation error the page surfaced.
 
 | Tool | What it does |
 |------|--------------|
-| `open_session(url)` / `close_session()` | Launches/tears down the single headless browser session for one `/apply` attempt |
+| `open_session(url)` / `close_session()` | Launches/tears down the single browser session for one `/apply` attempt |
 | `fill_field(field_id, value)` | Sets a form field's value; reports success or the page's own validation error |
 | `fill_credential_field(field_id, site)` | Same, but the value is a stored password resolved server-side — it never enters the LLM's context or this conversation |
 | `advance_page()` | Submits/advances the current page; retried with backoff on a crash, timeout, or network drop |
@@ -40,10 +40,22 @@ and report back what happened, including any validation error the page surfaced.
 - **`retry_with_backoff` as its own module.** Both `open_session`'s navigation and `advance_page`'s submit wrap
   the same generic, injectable-sleep retry helper rather than each hand-rolling a loop — the reliability policy
   (3 attempts, exponential backoff) is defined once and unit-tested once, not duplicated per call site.
-- **Fakes over a real browser in tests.** Every browser-tool test injects a fake page object (or a fake
-  `browser_factory`) instead of driving real Playwright. The full suite runs in well under a second with no
-  browser binaries required in CI — the tradeoff is that the real Playwright adapter itself is a thin,
-  intentionally-untested wrapper around a few one-line calls.
+- **Fakes for unit tests, real Chromium for the adapter itself.** Every browser-*tool* test (`open_session`,
+  `fill_field`, `advance_page`, ...) injects a fake page object so the bulk of the suite stays fast and
+  browser-free. The real Playwright adapter that those fakes stand in for is exercised separately, against
+  local HTML fixtures in a real (headless-forced) Chromium instance — it's the one place a fake can't catch a
+  bug in the adapter's own Playwright calls (e.g. a page navigated to before its JS content had rendered).
+- **`goto()` waits for `networkidle`, not just `load`.** Many real careers pages render their actual application
+  form as a client-side "micro-app" well after the base HTML's `load` event fires; waiting only for `load`
+  reliably captured an empty page shell. `networkidle` costs a little latency but is what makes `open_session`
+  actually see the rendered form.
+- **Field errors detected via a best-effort `aria-invalid`/`aria-describedby` heuristic.** `advance_page`'s
+  real adapter has no way to know an arbitrary site's validation markup in advance, so after submitting it
+  scans for `aria-invalid="true"` elements and reads their message from whatever `aria-describedby` points at.
+  It won't catch a page that signals errors some other way, but costs nothing to add and catches the common
+  case.
+- **Visible by default, `--headless` to opt out.** Watching the browser act on a page is the fastest way to
+  debug a stuck `/apply` run, so `peddler` launches Chromium visibly unless you pass `--headless`.
 - **Passwords never reach the LLM.** `read_credentials` deliberately omits the password from its return value;
   `fill_credential_field` resolves and applies it server-side. The only code path a stored password travels
   through is one the LLM's context never sees.
@@ -90,8 +102,10 @@ $ peddler --dir ~/job-search --credentials ~/job-search/.peddler/credentials.jso
 ```
 
 `--dir` defaults to the current directory; `--credentials`/`--applog` default to `~/.peddler/credentials.json`/
-`~/.peddler/applications.log`. Anything after a `--` is forwarded to `claude` itself (e.g. `-- --model opus`).
-Closing the terminal (or exiting Claude Code normally) ends the whole session, MCP server included.
+`~/.peddler/applications.log`. The browser session is visible by default (so you can watch `/apply` work);
+pass `--headless` to run it out of sight. Anything after a `--` is forwarded to `claude` itself (e.g.
+`-- --model opus`). Closing the terminal (or exiting Claude Code normally) ends the whole session, MCP server
+included.
 
 From inside that Claude Code session:
 
@@ -124,7 +138,7 @@ Peddler: 🎉 Application submitted successfully. Check your email for follow-up
     │   ├── launcher.py     ← the `peddler` console script
     │   └── email.py        ← CV contact-email extraction
     ├── scripts/            ← dev tooling (e.g. the per-file coverage check, below)
-    └── tests/              ← 132 tests, 99%+ coverage
+    └── tests/              ← 140 tests, 99%+ coverage
 
 ## Dev
 
