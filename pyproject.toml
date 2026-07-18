@@ -8,6 +8,10 @@ dependencies = [
     "playwright>=1.61.0",
 ]
 
+[project.scripts]
+peddler-mcp = "peddler.mcp.main:main"
+peddler = "peddler.launcher:main"
+
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
