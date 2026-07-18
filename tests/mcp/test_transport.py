@@ -47,3 +47,31 @@ def test_read_message_returns_none_after_exhausting_all_lines():
     transport = Transport(stdin=io.StringIO('{"a": 1}\n'), stdout=io.StringIO())
     assert transport.read_message() == {"a": 1}
     assert transport.read_message() is None
+
+
+def test_write_message_flushes_stdout():
+    class _UnflushedStream:
+        """A stream whose .write() alone proves nothing was actually sent.
+
+        Real OS pipes (unlike io.StringIO) are block-buffered when not a
+        TTY: a write() can sit in the buffer indefinitely without an
+        explicit flush(), which is exactly what broke the real MCP
+        server -- Claude Code never saw a response until the process
+        happened to exit. This fake tracks flush() calls explicitly so
+        the test fails if write_message() only writes without flushing.
+        """
+
+        def __init__(self):
+            self.written = ""
+            self.flushed = False
+
+        def write(self, data):
+            self.written += data
+
+        def flush(self):
+            self.flushed = True
+
+    stream = _UnflushedStream()
+    Transport(stdin=io.StringIO(), stdout=stream).write_message({"a": 1})
+
+    assert stream.flushed is True
