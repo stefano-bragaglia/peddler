@@ -47,6 +47,10 @@ and report back what happened, including any validation error the page surfaced.
 - **Passwords never reach the LLM.** `read_credentials` deliberately omits the password from its return value;
   `fill_credential_field` resolves and applies it server-side. The only code path a stored password travels
   through is one the LLM's context never sees.
+- **`peddler` execs `claude` instead of spawning and babysitting it.** Claude Code already spawns the MCP server
+  as its own child process and kills it on exit — that's how MCP over stdio works, not something `peddler` has
+  to implement. Replacing its own process (`os.execvp`) means closing the terminal tears the whole chain down
+  together via ordinary OS signal propagation, with no manual process-pairing code.
 
 ## Known limitations
 
@@ -54,7 +58,10 @@ By design, not by omission — explicitly out of scope for this version:
 
 - No CAPTCHA solving or anti-bot/stealth evasion beyond normal, honest form-filling.
 - No cover-letter generation.
-- One active `/apply` session at a time; concurrent runs aren't supported.
+- One active `/apply` session at a time; concurrent runs aren't supported. `peddler` makes running multiple
+  simultaneous sessions easier to reach for, but neither `CredentialStore` nor `ApplicationLog` has file
+  locking — for now, either apply to one job at a time or point simultaneous sessions at distinct
+  `--credentials`/`--applog` paths.
 - The credentials log book is stored in plaintext on disk — encryption at rest is deferred.
 - Obfuscated emails in a CV (e.g. `name (at) domain (dot) com`) aren't recognized by the email extractor; only
   plain `user@domain.tld` forms are.
@@ -68,9 +75,23 @@ uv sync
 uv run playwright install chromium
 ```
 
+This installs two console scripts: `peddler` (the launcher you actually run) and `peddler-mcp` (the MCP server
+process — spawned by Claude Code itself, never run directly).
+
 ## Usage
 
-From Claude CLI:
+Start a session with the `peddler` launcher — it checks Playwright is ready, registers the MCP server with
+Claude Code (local scope, idempotent), and hands off to `claude` in the target workspace:
+
+```
+$ uv run peddler --dir ~/job-search --credentials ~/job-search/.peddler/credentials.json
+```
+
+`--dir` defaults to the current directory; `--credentials`/`--applog` default to `~/.peddler/credentials.json`/
+`~/.peddler/applications.log`. Anything after a `--` is forwarded to `claude` itself (e.g. `-- --model opus`).
+Closing the terminal (or exiting Claude Code normally) ends the whole session, MCP server included.
+
+From inside that Claude Code session:
 
 ```
 > /apply ~/cv.md ~/jobs/acme-backend-swe/jd.md https://acme.example.com/careers/apply/1234
@@ -93,23 +114,26 @@ Peddler: 🎉 Application submitted successfully. Check your email for follow-up
 
     peddler/
     ├── src/peddler/
-    │   ├── mcp/            ← stdio JSON-RPC transport, tool registry, server loop
+    │   ├── mcp/            ← stdio JSON-RPC transport, tool registry, server loop, peddler-mcp entry point
     │   ├── credentials/    ← credentials log book: storage, password generation, tools
     │   ├── applog/         ← persistent application log: storage, tools
     │   ├── browser/        ← Playwright session lifecycle, field fill, navigation, retry policy
     │   ├── commands/       ← the `/apply` slash command definition
+    │   ├── launcher.py     ← the `peddler` console script
     │   └── email.py        ← CV contact-email extraction
-    └── tests/              ← 105 tests, 95%+ coverage
+    ├── scripts/            ← dev tooling (e.g. the per-file coverage check, below)
+    └── tests/              ← 126 tests, 99%+ coverage
 
 ## Dev
 
 ```bash
 uv run ruff check                                   # lint + docstring style (pydocstyle)
 uv run radon cc -n B src tests                      # cyclomatic complexity report
-uv run pytest --cov=src/peddler --cov-fail-under=90  # test suite with coverage gate
+uv run pytest --cov=src/peddler --cov-fail-under=90  # test suite with an aggregate coverage gate
+uv run coverage json -o coverage.json -q && uv run python scripts/check_file_coverage.py  # per-file coverage gate
 ```
 
-A pre-commit hook enforces all three gates on every commit; CI enforces them on every pull request.
+A pre-commit hook enforces all four gates on every commit; CI enforces them on every pull request.
 
 ## Contributing
 
