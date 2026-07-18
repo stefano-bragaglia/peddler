@@ -12,6 +12,8 @@ from peddler.applog.store import DEFAULT_APPLOG_PATH
 from peddler.browser import session as browser_session
 from peddler.credentials.store import DEFAULT_CREDENTIALS_PATH
 
+_PACKAGED_APPLY_MD = Path(__file__).parent / "commands" / "apply.md"
+
 
 class McpRegistrationError(Exception):
     """Raised when MCP server registration fails for a reason other than already being registered."""
@@ -30,6 +32,30 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--credentials", default=str(DEFAULT_CREDENTIALS_PATH))
     parser.add_argument("--applog", default=str(DEFAULT_APPLOG_PATH))
     return parser
+
+
+def _install_apply_command(target_path: Path) -> None:
+    """Install the packaged `/apply` command file at ``target_path`` if needed.
+
+    :param target_path: Where Claude Code looks for the command file
+        (e.g. ``~/.claude/commands/apply.md``).
+    :type target_path: Path
+    """
+    packaged_content = _PACKAGED_APPLY_MD.read_text()
+    try:
+        if target_path.exists() and target_path.read_text() == packaged_content:
+            return
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.write_text(packaged_content)
+    except OSError as exc:
+        print(f"peddler: warning: failed to install /apply command: {exc}", file=sys.stderr)
+
+
+def _default_install_apply_command() -> None:  # pragma: no cover
+    # ponytail: writes to the real ~/.claude/commands/apply.md, deliberately
+    # untested here; every main() test injects a fake/no-op install_command,
+    # and _install_apply_command's own logic is tested directly with tmp_path.
+    _install_apply_command(Path.home() / ".claude" / "commands" / "apply.md")
 
 
 def _default_check_playwright() -> bool:  # pragma: no cover
@@ -76,6 +102,7 @@ def _register_mcp_server(  # pragma: no cover
 
 def main(
     argv: list[str] | None = None,
+    install_command: Callable[[], None] = _default_install_apply_command,
     check_playwright: Callable[[], bool] = _default_check_playwright,
     register_mcp: Callable[[str, str, str], None] = _register_mcp_server,
     exec_fn: Callable[[str, list[str]], None] = os.execvp,
@@ -87,6 +114,10 @@ def main(
     :param argv: Command-line arguments, excluding the program name.
         Defaults to ``sys.argv[1:]``.
     :type argv: list[str] | None
+    :param install_command: Installs the `/apply` command file so
+        Claude Code can discover it. Warns (doesn't raise) on failure.
+        Injectable for testing.
+    :type install_command: Callable[[], None]
     :param check_playwright: Returns whether Playwright's browser
         binaries are usable. Injectable for testing.
     :type check_playwright: Callable[[], bool]
@@ -114,6 +145,8 @@ def main(
     if not Path(args.dir).is_dir():
         print(f"peddler: no such directory: {args.dir}", file=sys.stderr)
         return 1
+
+    install_command()
 
     if not check_playwright():
         print(
