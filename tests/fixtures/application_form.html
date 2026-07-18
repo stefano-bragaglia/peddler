@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fixture Application Form</title>
+</head>
+<body>
+<div id="form-view">
+  <form id="app-form">
+    <label for="full_name">Full name</label>
+    <input type="text" id="full_name" name="full_name">
+
+    <label for="phone">Phone (format: 555-555-5555)</label>
+    <input type="text" id="phone" name="phone" aria-describedby="phone-error">
+    <span id="phone-error" role="alert"></span>
+
+    <label for="agree_to_terms">Agree to terms</label>
+    <input type="checkbox" id="agree_to_terms" name="agree_to_terms">
+
+    <button type="submit" id="submit-btn">Submit</button>
+  </form>
+</div>
+<div id="success-view" style="display:none">
+  <h1>Thank you for applying!</h1>
+</div>
+<script>
+  document.getElementById("app-form").addEventListener("submit", function (event) {
+    event.preventDefault();
+    var phone = document.getElementById("phone");
+    var phoneError = document.getElementById("phone-error");
+    var pattern = /^\d{3}-\d{3}-\d{4}$/;
+    if (!pattern.test(phone.value)) {
+      phone.setAttribute("aria-invalid", "true");
+      phoneError.textContent = "Invalid phone number format";
+      return;
+    }
+    phone.removeAttribute("aria-invalid");
+    phoneError.textContent = "";
+    document.getElementById("form-view").style.display = "none";
+    document.getElementById("success-view").style.display = "block";
+  });
+</script>
+</body>
+</html>

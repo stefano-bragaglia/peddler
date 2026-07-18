@@ -31,6 +31,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dir", default=os.getcwd())
     parser.add_argument("--credentials", default=str(DEFAULT_CREDENTIALS_PATH))
     parser.add_argument("--applog", default=str(DEFAULT_APPLOG_PATH))
+    parser.add_argument("--headless", action="store_true", default=False)
     return parser
 
 
@@ -73,6 +74,7 @@ def _register_mcp_server(  # pragma: no cover
     target_dir: str,
     credentials_path: str,
     applog_path: str,
+    headless: bool = False,
     run: Callable[..., subprocess.CompletedProcess] = subprocess.run,
 ) -> None:
     # ponytail: real `claude mcp add` subprocess call, deliberately untested here
@@ -89,6 +91,8 @@ def _register_mcp_server(  # pragma: no cover
             f"PEDDLER_CREDENTIALS_PATH={credentials_path}",
             "--env",
             f"PEDDLER_APPLOG_PATH={applog_path}",
+            "--env",
+            f"PEDDLER_HEADLESS={'1' if headless else '0'}",
             "--",
             "peddler-mcp",
         ],
@@ -104,7 +108,7 @@ def main(
     argv: list[str] | None = None,
     install_command: Callable[[], None] = _default_install_apply_command,
     check_playwright: Callable[[], bool] = _default_check_playwright,
-    register_mcp: Callable[[str, str, str], None] = _register_mcp_server,
+    register_mcp: Callable[[str, str, str, bool], None] = _register_mcp_server,
     exec_fn: Callable[[str, list[str]], None] = os.execvp,
     chdir: Callable[[str], None] = os.chdir,
     which: Callable[[str], str | None] = shutil.which,
@@ -125,7 +129,7 @@ def main(
         Raises :class:`McpRegistrationError` on genuine failure;
         returns normally on success or "already registered". Injectable
         for testing.
-    :type register_mcp: Callable[[str, str, str], None]
+    :type register_mcp: Callable[[str, str, str, bool], None]
     :param exec_fn: Replaces the current process with ``claude``.
         Injectable for testing (defaults to :func:`os.execvp`).
     :type exec_fn: Callable[[str, list[str]], None]
@@ -157,7 +161,7 @@ def main(
         return 1
 
     try:
-        register_mcp(args.dir, args.credentials, args.applog)
+        register_mcp(args.dir, args.credentials, args.applog, args.headless)
     except McpRegistrationError as exc:
         print(f"peddler: failed to register MCP server: {exc}", file=sys.stderr)
         return 1
